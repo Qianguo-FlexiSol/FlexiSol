@@ -1,5 +1,6 @@
 1.INSTALL
-.conda env create -f env.yml
+
+conda env create -f env.yml
   conda activate FlexSol
   python -c "
 from transformers import AutoTokenizer, EsmModel
@@ -31,5 +32,8 @@ dependencies:
     - xgboost==2.0.3
     - lightgbm==4.3.0
     - jupyterlab==4.1.0
+
+	  
   2.USAGE
+
 python predict_single.py 
