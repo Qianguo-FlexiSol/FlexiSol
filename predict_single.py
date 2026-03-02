@@ -30,4 +30,4 @@ if __name__ == "__main__":
     seq = ""
     model = load_model(seq2feat(seq).shape[1])
     p = predict_seq(seq, model)
-    print("Single prediction:", round(p, 4), "Soluble" if p > 0.6else "Insoluble")
+    print("Single prediction:", round(p, 4), "Soluble" if p > 0.6 else "Insoluble")
