@@ -69,16 +69,27 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"使用设备: {DEVICE}")
 
 MODEL_NAME = "facebook/esm2_t33_650M_UR50D"
-print("正在加载 ESM-2 模型（首次需下载约 2.4GB，请耐心等待）...")
+print(
+    "Loading the ESM-2 model "
+    "(approximately 2.4 GB will be downloaded on the first run; please be patient)..."
+)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 esm_model = EsmModel.from_pretrained(MODEL_NAME).to(DEVICE).eval()
-print("ESM-2 模型加载完成。")
+
+print("ESM-2 model loaded successfully.")
 
 def seq2feat(sequence):
-    inputs = tokenizer(sequence, return_tensors="pt", truncation=True, max_length=512).to(DEVICE)
+    inputs = tokenizer(
+        sequence,
+        return_tensors="pt",
+        truncation=True,
+        max_length=512
+    ).to(DEVICE)
+
     with torch.no_grad():
         outputs = esm_model(**inputs)
-    # 返回 [CLS] token 的嵌入 (1, 1280)
+
+    # Return the [CLS] token embedding with shape (1, 1280)
     return outputs.last_hidden_state[:, 0, :].cpu().numpy()
 
 WEIGHT_PATH = "/content/SeqSol/best_esm650m_nn.pth"
@@ -89,42 +100,60 @@ hidden1 = state_dict["net.0.weight"].shape[0]     # 256
 hidden2 = state_dict["net.3.weight"].shape[0]     # 128
 out_dim = state_dict["net.6.weight"].shape[0]     # 1
 
-print(f"MLP 维度：输入 {in_dim} → 隐藏1 {hidden1} → 隐藏2 {hidden2} → 输出 {out_dim}")
+print(
+    f"MLP dimensions: input {in_dim} → hidden layer 1 {hidden1} "
+    f"→ hidden layer 2 {hidden2} → output {out_dim}"
+)
 
 mlp = MLP(input_dim=in_dim, hidden1=hidden1, hidden2=hidden2, output_dim=out_dim).to(DEVICE)
 mlp.load_state_dict(state_dict)
 mlp.eval()
-print("MLP 权重加载成功。")
+print("MLP success")
 
 def predict_solubility(sequence):
     feat = seq2feat(sequence)                     # (1, 1280)
     feat_tensor = torch.tensor(feat).float().to(DEVICE)
     with torch.no_grad():
-        logit = mlp(feat_tensor).item()           # 线性层输出（未经 sigmoid）
+        logit = mlp(feat_tensor).item()          
         prob = torch.sigmoid(torch.tensor(logit)).item()
     return prob
 
-print("\n" + "="*50)
-print("蛋白质可溶性预测工具")
-print("请输入单字母表示的蛋白质序列（例如：MLSRAVCGTSRQLAPVLAYLGSRQ）")
-print("输入空行或 'quit' 退出")
-print("="*50)
+print("\n" + "=" * 50)
+print("Protein Solubility Prediction Tool")
+print(
+    "Enter a protein sequence using single-letter amino acid codes "
+    "(e.g., MLSRAVCGTSRQLAPVLAYLGSRQ)"
+)
+print("Enter an empty line or type 'quit' to exit")
+print("=" * 50)
 
 while True:
-    seq = input("\n请输入序列: ").strip()
-    if not seq or seq.lower() == 'quit':
-        print("退出程序。")
+    seq = input("\nEnter sequence: ").strip()
+
+    if not seq or seq.lower() == "quit":
+        print("Exiting the program.")
         break
-    # 简单检验氨基酸组成（仅警告）
+
+    # Perform a basic amino acid composition check (warning only)
     allowed = set("ACDEFGHIKLMNPQRSTVWY")
+
     if not set(seq.upper()).issubset(allowed):
-        print("警告：序列含有非标准氨基酸字母，仍尝试预测...")
+        print(
+            "Warning: The sequence contains non-standard amino acid letters. "
+            "Prediction will still be attempted..."
+        )
+
     try:
         prob = predict_solubility(seq)
-        pred = "可溶性 (Soluble)" if prob > 0.6 else "不可溶性 (Insoluble)"
-        print(f"结果：可溶性概率 = {prob:.4f}  →  {pred}")
+        pred = "Soluble" if prob > 0.6 else "Insoluble"
+
+        print(
+            f"Result: solubility probability = {prob:.4f} "
+            f"→ {pred}"
+        )
+
     except Exception as e:
-        print(f"预测出错：{e}")
+        print(f"Prediction error: {e}")
 		
 # Example
 prob = predict_solubility("MLSRAVCGTSRQLAPVLAYLGSRQ")
